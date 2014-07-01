@@ -8,8 +8,9 @@ var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
-
 var app = express();
+app.use(express.cookieParser("secret"));
+app.use(express.session());
 
 app.configure(function() {
   app.set('views', __dirname + '/views');
@@ -19,21 +20,29 @@ app.configure(function() {
   app.use(express.static(__dirname + '/public'));
 });
 
-app.get('/', function(req, res) {
+var checkUser = function(req, res, next){
+  if (req.session.user){
+    next();
+  } else {
+    res.redirect('/login');
+  }
+};
+
+app.get('/', checkUser, function(req, res) {
   res.render('index');
 });
 
-app.get('/create', function(req, res) {
+app.get('/create', checkUser, function(req, res) {
   res.render('index');
 });
 
-app.get('/links', function(req, res) {
+app.get('/links', checkUser, function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   })
 });
 
-app.post('/links', function(req, res) {
+app.post('/links', checkUser, function(req, res) {
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
@@ -71,6 +80,7 @@ app.post('/links', function(req, res) {
 /************************************************************/
 app.get('/signup', function(req, res){
   res.render('signup');
+
 })
 
 app.get('/login', function(req, res){
@@ -87,9 +97,12 @@ app.post('/signup', function(req, res){
       bcrypt.hash(password, null, null, function(err, hash){
         var user = new User({username: username, password: hash}).save().then(
           function(){
+            req.session.regenerate(function(){
+            req.session.user = username;
             res.redirect('/');
           });
-      })
+        });
+      });
     }
   });
 });
@@ -100,20 +113,29 @@ app.post('/login', function(req, res){
     if (foundUser){
       bcrypt.compare(password, foundUser.attributes.password, function(err, isCorrect){
         if (isCorrect){
-          res.redirect('/');
+          console.log("You are logged in, welcome!")
+          req.session.regenerate(function(){
+            req.session.user = username;
+            res.redirect('/');
+          });
         }
-        else {
+        else {     //If password is wrong, redirect to signup
+          console.log("Please signup for Shortly service")
           res.redirect('/signup');
         }
       });
-    } else {
+    } else {  // If username is unknown, redirect to login
+      console.log("unknown username")
       res.redirect('/login');
     }
   });
 });
 
-
-
+app.get('/logout', function(req, res){
+  req.session.destroy(function(){
+    res.redirect('/');
+  });
+});
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
