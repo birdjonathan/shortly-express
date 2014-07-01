@@ -1,7 +1,7 @@
 var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
-
+var bcrypt = require('bcrypt-nodejs');
 var db = require('./app/config');
 var Users = require('./app/collections/users');
 var User = require('./app/models/user');
@@ -69,6 +69,49 @@ app.post('/links', function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+app.get('/signup', function(req, res){
+  res.render('signup');
+})
+
+app.get('/login', function(req, res){
+  res.render('login');
+})
+
+app.post('/signup', function(req, res){
+  var username = req.body.username;
+  var password = req.body.password;
+  new User({username: username}).fetch().then( function(foundUser){
+    if (foundUser){
+      res.redirect('/');
+    } else {
+      bcrypt.hash(password, null, null, function(err, hash){
+        var user = new User({username: username, password: hash}).save().then(
+          function(){
+            res.redirect('/');
+          });
+      })
+    }
+  });
+});
+app.post('/login', function(req, res){
+  var username = req.body.username;
+  var password = req.body.password;
+  new User({username: username}).fetch().then( function(foundUser){
+    if (foundUser){
+      bcrypt.compare(password, foundUser.attributes.password, function(err, isCorrect){
+        if (isCorrect){
+          res.redirect('/');
+        }
+        else {
+          res.redirect('/signup');
+        }
+      });
+    } else {
+      res.redirect('/login');
+    }
+  });
+});
+
 
 
 
